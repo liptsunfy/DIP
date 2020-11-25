@@ -1,0 +1,1054 @@
+﻿#ifndef MYFUN_H
+#define MYFUN_H
+
+#include<windows.h>
+#include <QString>
+#include<QFile>
+
+#include "math.h"
+#include <stack>
+
+
+//宏定义
+#define PI 3.141592653
+
+using namespace std;
+
+unsigned char *m_pImgData;     // 读入图像数据的指针
+unsigned char *m_pImgDataOut;  // 解包裹结果
+unsigned char *m_rImgDataOut;  // 重构结果
+int m_nBitCountOut;  //  图像数据表征相位差
+int m_imgWidthOut;   //  图像的宽
+int m_imgHeightOut;  //  图像的高
+int m_dPhaseDifOut;  //  图像数据表征相位差
+
+float *m_sImgDataOut;   //  3D展示结果
+
+int m_valueD;  //计算重构时的d值
+
+int m_imgWidth;   //图像的宽
+int m_imgHeight;  //图像的高
+int m_dPhaseDif;  //图像数据表征相位差
+int m_nBitCount;  //图像类型，每像素位数
+
+
+QByteArray byteArray;  //保存后的数据，文件头+信息头+像素数据
+RGBQUAD *pColorTable;  //颜色表指针
+
+
+
+void swap(double *Array, long i, long j, int length)
+{
+    double DataTemp;
+    int m;
+    for (m = 0; m < length; m++)
+    {
+        DataTemp = Array[length*i+m];
+        Array[length*i+m] = Array[length*j+m];
+        Array[length*j+m] = DataTemp;
+    }
+}
+
+
+
+long Partition(double *Array,long start,long end, int length)//通过这一步保证了轴心位置被正确分配
+{
+    double pivotvalue = Array[length*start];  //轴心元素
+    while(start<end)
+    {
+        //当末尾的元素小于轴心元素值时，不做处理，让尾指针往前跳
+        while( start<end && Array[length*end] <= pivotvalue )
+        {
+            end--;
+        }
+
+        //找到第一个不满足Array[end]<=pivot的元素，让其Array[end]和Array[start]互换
+        if ( start != end )
+        {
+            swap(Array,start,end,length);
+        }
+
+        //当前端的元素大于轴心元素时，不对元素做任何处理，让头指针往尾部跳
+        while(start<end && Array[length*start] >= pivotvalue )
+        {
+            start++;
+        }
+
+        //找到第一个不满足Array[start]>=pivot的元素，让其Array[end]和Array[start]互换
+        if ( start != end )
+        {
+            swap(Array,start,end,length);
+        }
+    }
+
+    return start;  //轴心位置
+}
+
+
+
+
+void quicksort(double *Array,long start,long end, int length)
+{
+    //非递归快速排序
+    stack<long> st;
+    if( start < end )
+    {
+        long pivot = Partition(Array, start, end, length);
+        if( start < pivot-1 )
+        {
+            st.push(start);
+            st.push(pivot-1);
+        }
+        if(pivot+1<end)
+        {
+            st.push(pivot+1);
+            st.push(end);
+        }
+
+        //其实就是用栈保存每一个待排序子串的首尾元素下标，下一次while循环时取出这个范围，对这段子序列进行partition操作
+        while(!st.empty())
+        {
+            MSG	 message;
+            if(::PeekMessage (&message,NULL,0,0,PM_REMOVE))
+            {
+                ::TranslateMessage (&message);
+                ::DispatchMessage (&message);
+            }
+
+            long behind=st.top();
+            st.pop();
+            long front=st.top();
+            st.pop();
+            pivot = Partition(Array, front, behind, length);
+            if(front < pivot-1)
+            {
+                st.push(front);
+                st.push(pivot-1);
+            }
+            if(pivot+1 < behind)
+            {
+                st.push(pivot+1);
+                st.push(behind);
+            }
+        }
+    }
+}
+
+
+
+//-----------------------------------------------------------------------------------------
+//给定一个图像位图数据、宽、高、颜色表指针及每像素所占的位数等信息,将其写到指定文件中
+bool readBmp(QString bmpName)
+{
+    FILE *file = fopen(bmpName.toLocal8Bit().data(), "rb");  //二进制读方式打开指定的图像文件
+    if (file == 0)
+        return 0;
+
+    // 读取文件头
+    BITMAPFILEHEADER fileHead;  //文件头
+    fread(&fileHead, 1, sizeof (BITMAPFILEHEADER),file);
+
+    //定义位图信息头结构变量，读取位图信息头进内存，存放在变量head中
+    BITMAPINFOHEADER infohead;
+    fread(&infohead, sizeof(BITMAPINFOHEADER), 1, file); //获取图像宽、高、每像素所占位数等信息
+    m_imgWidth = infohead.biWidth;
+    m_imgHeight = infohead.biHeight;
+    m_nBitCount = infohead.biBitCount;  //定义变量，计算图像每行像素所占的字节数（必须是4的倍数）
+
+    int lineByte = (m_imgWidth * m_nBitCount / 8 + 3) / 4 * 4;  //灰度图像有颜色表，且颜色表表项为256
+
+    //申请颜色表所需要的空间，读颜色表进内存
+    pColorTable = new RGBQUAD[256];
+    fread(pColorTable, sizeof(RGBQUAD), 256, file);
+
+    //申请位图数据所需要的空间，读位图数据进内存
+    m_pImgData = new unsigned char[lineByte * m_imgHeight];
+    fread(m_pImgData, 1, lineByte * m_imgHeight, file);
+
+    fclose(file);  //关闭文件
+    return 1;  //读取文件成功
+}
+
+
+// 计算颜色表长度
+int ComputeColorTableLength(int nBCount)
+{
+    int nColorLength;
+    switch(nBCount)
+    {
+        case 1:
+            nColorLength = 2;
+            break;
+
+        case 4:
+            nColorLength = 16;
+            break;
+
+        case 8:
+            nColorLength = 256;
+            break;
+
+        case 16:
+        case 24:
+
+        case 32:
+            nColorLength = 0;
+            break;
+
+        default:
+            assert(FALSE);  //断言它的条件返回错误，则终止程序执行
+    }
+
+    assert((nColorLength>=0) && (nColorLength <=256));
+    return nColorLength;
+}
+
+
+
+//---------------------------------------------------------------------------
+// 显示图像结果
+bool showBmp(unsigned char *imgBuf, int width, int height, int biBitCount, RGBQUAD *ColorTable)
+{
+    byteArray = NULL;  //图像存储置空
+
+    //如果位图数据指针为0，则没有数据传入，函数返回
+    if (!imgBuf)
+        return 0;
+
+    //待存储图像数据每行字节数为4的倍数
+    int lineByte = (width * biBitCount / 8 + 3) / 4 * 4;
+
+    //颜色表大小，以字节为单位，灰度图像颜色表为1024字节，彩色图像颜色表大小为0
+    int colorTablesize = ComputeColorTableLength(biBitCount);
+
+    //申请位图文件头结构变量，填写文件头信息
+    BITMAPFILEHEADER fileHead;
+    fileHead.bfType = 0x4D42;  //bmp类型
+
+    //bfSize是图像文件4个组成部分之和
+    fileHead.bfSize = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof (RGBQUAD)*ComputeColorTableLength(biBitCount);
+    fileHead.bfReserved1 = 0;
+    fileHead.bfReserved2 = 0;
+    fileHead.bfOffBits = sizeof(BITMAPFILEHEADER)+sizeof(BITMAPINFOHEADER);
+
+    //申请位图信息头结构变量，填写信息头信息
+    BITMAPINFOHEADER infohead;
+    infohead.biBitCount = biBitCount;
+    infohead.biClrImportant = colorTablesize;
+    infohead.biClrUsed = colorTablesize;
+    infohead.biCompression = 0;
+    infohead.biHeight = height;
+    infohead.biPlanes = 1;
+    infohead.biSize = sizeof(BITMAPINFOHEADER);
+    infohead.biSizeImage = lineByte*height;
+    infohead.biWidth = width;
+    infohead.biXPelsPerMeter = 0;
+    infohead.biYPelsPerMeter = 0;
+
+    byteArray.append((char*)&fileHead,sizeof (BITMAPFILEHEADER));
+    byteArray.append((char*)&infohead,sizeof (BITMAPINFOHEADER));
+    byteArray.append((char*)ColorTable, sizeof (RGBQUAD) * ComputeColorTableLength(biBitCount));  //颜色表
+    byteArray.append((char*)imgBuf,infohead.biSizeImage);
+
+    return 1;
+}
+
+
+
+//-------------------------------------------------------------------------------
+// 解包裹
+void PhaseUnwrap(unsigned char *pImgData,int imgWidth, int BitCount, int imgHeight,int dPhaseDif)
+{
+
+    //循环变量
+    int i,j;
+
+    //准备工作
+    int lineByte = (imgWidth * BitCount / 8 + 3) / 4 * 4;
+    m_nBitCountOut = BitCount;
+    m_imgWidthOut = imgWidth;
+    m_imgHeightOut = imgHeight;
+    int lineByteOut = (m_imgWidthOut * m_nBitCountOut / 8 + 3) / 4 * 4;
+
+    if(m_pImgDataOut != NULL)
+    {
+        delete []m_pImgDataOut;
+        m_pImgDataOut = NULL;
+    }
+    m_pImgDataOut = new unsigned char[lineByteOut * m_imgHeightOut];
+
+    //申请图像数据处理缓冲区，将图像数据变成浮点型，并转换至m_dPhaseDif范围
+    double *pBufData = new double[imgWidth * imgHeight];
+    for ( i = 0; i < imgHeight; i++)
+    {
+        for ( j = 0; j < imgWidth; j++)
+        {
+            pBufData[i * imgWidth + j] = pImgData[i * lineByte + j];
+            pBufData[i * imgWidth + j] = pBufData[i * imgWidth + j]  * dPhaseDif / 255;
+        }
+    }
+
+    //申请图像标志区，并初始化为0
+    unsigned char *pBufTag = new unsigned char[imgWidth * imgHeight];
+    memset(pBufTag, 0 , imgWidth * imgHeight);
+
+    //申请图像坐标队列
+    SIZE *pBufPosOriginal=new SIZE[imgWidth * imgHeight];
+    SIZE *pBufPos = pBufPosOriginal;
+
+    //队列长度标志
+    int iLength = 0;
+
+    //选取图像中心为起始点，并将初始点坐标标志区置脏
+    pBufPos[iLength].cx = imgHeight/2;
+    pBufPos[iLength].cy = imgWidth/2;
+    pBufTag[pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] = 1;
+
+    while( iLength != -1 )
+    {
+        //下方像素
+        if ( ( pBufPos[0].cx > 0 ) && ( pBufTag[ (pBufPos[0].cx - 1) * imgWidth + pBufPos[0].cy ]  == 0 ) )
+        {
+            //队列PUSH，并修改队列长度
+            iLength = iLength + 1;
+            pBufPos[iLength].cx = pBufPos[0].cx - 1;
+            pBufPos[iLength].cy = pBufPos[0].cy;
+
+            //进队列点坐标标志区置脏
+            pBufTag[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] = 1;
+
+            //解包裹过程
+            while ( abs( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+            - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] ) > dPhaseDif/2 )
+            {
+                if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] < -dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] + dPhaseDif;
+                }
+                else if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] > dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] - dPhaseDif;
+                }
+            }
+        }
+
+        //左方像素
+        if ( ( pBufPos[0].cy > 0 ) && ( pBufTag[ (pBufPos[0].cx) * imgWidth + pBufPos[0].cy - 1 ]  == 0 ) )
+        {
+            iLength = iLength + 1;
+            pBufPos[iLength].cx = pBufPos[0].cx;
+            pBufPos[iLength].cy = pBufPos[0].cy - 1;
+
+            pBufTag[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] = 1;
+
+            while ( abs( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+            - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] ) > dPhaseDif/2 )
+            {
+                if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] < -dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] + dPhaseDif;
+                }
+                else if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] > dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] - dPhaseDif;
+                }
+            }
+        }
+
+        //上方像素
+        if ( ( pBufPos[0].cx < imgHeight - 1 ) && ( pBufTag[ (pBufPos[0].cx + 1) * imgWidth + pBufPos[0].cy ]  == 0 ) )
+        {
+            iLength = iLength + 1;
+            pBufPos[iLength].cx = pBufPos[0].cx + 1;
+            pBufPos[iLength].cy = pBufPos[0].cy;
+
+            pBufTag[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] = 1;
+
+            while ( abs( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+            - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] ) > dPhaseDif/2 )
+            {
+                if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] < -dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] + dPhaseDif;
+                }
+                else if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] > dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] - dPhaseDif;
+                }
+            }
+        }
+
+        //右方像素
+        if ( ( pBufPos[0].cy < imgWidth - 1 ) && ( pBufTag[ (pBufPos[0].cx) * imgWidth + pBufPos[0].cy + 1 ]  == 0 ) )
+        {
+            iLength = iLength + 1;
+            pBufPos[iLength].cx = pBufPos[0].cx;
+            pBufPos[iLength].cy = pBufPos[0].cy + 1;
+
+            pBufTag[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] = 1;
+
+            while ( abs( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+            - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] ) > dPhaseDif/2 )
+            {
+                if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] < -dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] + dPhaseDif;
+                }
+                else if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] > dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] - dPhaseDif;
+                }
+            }
+        }
+
+        //队列POP，并修改队列长度
+        if (iLength > 0)
+        {
+            pBufPos = pBufPos + 1;
+        }
+        iLength = iLength - 1;
+    }
+
+    //寻找图像区域数据最值
+    double Min = pBufData[0];
+    double Max = pBufData[0];
+    for( i = 0; i < imgWidth * imgHeight; i++)
+    {
+        if ( pBufData[i] < Min )
+        {
+            Min = pBufData[i];
+        }
+        if ( pBufData[i] > Max )
+        {
+            Max = pBufData[i];
+        }
+    }
+
+    //255级灰度校正
+    for ( i = 0; i < m_imgHeightOut; i++)
+    {
+        for ( j = 0; j < m_imgWidthOut; j++)
+        {
+            m_pImgDataOut[i * lineByteOut + j]
+                = (unsigned char) ( (pBufData[i * imgWidth + j] - Min) * 255 / ( Max - Min ) );
+        }
+    }
+    m_dPhaseDifOut = Max - Min;
+    delete []pBufData;
+    delete []pBufPosOriginal;
+    delete []pBufTag;
+}
+
+
+
+double Differ(double x, double y)
+{
+    double dif = 0;
+    while(1)
+    {
+        if (( x - y - dif ) > 1.1*PI)
+        {
+            dif += 2*PI;
+        }
+        else if( ( x - y - dif ) < -1.1*PI)
+        {
+            dif -= 2*PI;
+        }
+        else
+        {
+            return dif;
+        }
+    }
+}
+
+
+//------------------------------------------------------------------------------
+//质量解包裹
+void PhaseUnwrap2(unsigned char *pImgData,int imgWidth, int BitCount, int imgHeight,int dPhaseDif)
+{
+    //循环变量
+    int i,j;
+
+    //准备工作
+    int lineByte = (imgWidth * BitCount / 8 + 3) / 4 * 4;
+    m_nBitCountOut = BitCount;
+    m_imgWidthOut = imgWidth;
+    m_imgHeightOut = imgHeight;
+    int lineByteOut = (m_imgWidthOut * m_nBitCountOut / 8 + 3) / 4 * 4;
+
+    if(m_pImgDataOut != NULL)
+    {
+        delete []m_pImgDataOut;
+        m_pImgDataOut = NULL;
+    }
+    m_pImgDataOut = new unsigned char[lineByteOut * m_imgHeightOut];
+
+    //申请图像数据处理缓冲区，将图像数据变成浮点型，并转换至m_dPhaseDif范围
+    double *pBufData = new double[imgWidth * imgHeight];
+    for ( i = 0; i < imgHeight; i++)
+    {
+        for ( j = 0; j < imgWidth; j++)
+        {
+            pBufData[i * imgWidth + j] = pImgData[i * lineByte + j];
+            pBufData[i * imgWidth + j] = pBufData[i * imgWidth + j]  * dPhaseDif / 255;
+        }
+    }
+
+    //申请图像标志区与标记队列，并初始化为0
+    unsigned int *pBufTag = new unsigned int[imgWidth * imgHeight];
+    memset(pBufTag, 0 , sizeof(unsigned int)*imgWidth * imgHeight);
+    unsigned int *pBufLin = new unsigned int[imgWidth * imgHeight];
+    memset(pBufLin, 0 , sizeof(unsigned int)*imgWidth * imgHeight);
+
+    //申请图像可靠度矩阵，并初始化为0
+    double *pBufRel = new double[imgWidth * imgHeight];
+    double dtmp1,dtmp2,dtmp3;
+    double V,H,D1,D2;
+    for ( i = 1; i < imgHeight - 1; i++)
+    {
+        for ( j = 1; j < imgWidth - 1; j++)
+        {
+            dtmp1 = pBufData[(i-1) * imgWidth + j] - pBufData[i * imgWidth + j];
+            dtmp2 = dtmp1 - 2*PI*floor(dtmp1/(2*PI)+0.5);
+            dtmp1 = pBufData[i * imgWidth + j] - pBufData[(i+1) * imgWidth + j];
+            dtmp3 = dtmp1 - 2*PI*floor(dtmp1/(2*PI)+0.5);
+            V = dtmp2 - dtmp3;
+            dtmp1 = pBufData[i * imgWidth + j - 1] - pBufData[i * imgWidth + j];
+            dtmp2 = dtmp1 - 2*PI*floor(dtmp1/(2*PI)+0.5);
+            dtmp1 = pBufData[i * imgWidth + j] - pBufData[i * imgWidth + j + 1];
+            dtmp3 = dtmp1 - 2*PI*floor(dtmp1/(2*PI)+0.5);
+            H = dtmp2 - dtmp3;
+            dtmp1 = pBufData[(i-1) * imgWidth + j - 1] - pBufData[i * imgWidth + j];
+            dtmp2 = dtmp1 - 2*PI*floor(dtmp1/(2*PI)+0.5);
+            dtmp1 = pBufData[i * imgWidth + j] - pBufData[(i+1) * imgWidth + j + 1];
+            dtmp3 = dtmp1 - 2*PI*floor(dtmp1/(2*PI)+0.5);
+            D1 = dtmp2 - dtmp3;
+            dtmp1 = pBufData[(i-1) * imgWidth + j + 1] - pBufData[i * imgWidth + j];
+            dtmp2 = dtmp1 - 2*PI*floor(dtmp1/(2*PI)+0.5);
+            dtmp1 = pBufData[i * imgWidth + j] - pBufData[(i+1) * imgWidth + j - 1];
+            dtmp3 = dtmp1 - 2*PI*floor(dtmp1/(2*PI)+0.5);
+            D2 = dtmp2 - dtmp3;
+            pBufRel[i * m_imgWidth + j] = sqrt(1/(V*V+H*H+D1*D1+D2*D2));
+        }
+    }
+
+    //获得可靠度序列并排序
+    double *pBufAry = new double[((imgWidth-2)*(imgHeight-3) + (imgWidth-3)*(imgHeight-2))*5];
+    for ( i = 1; i < imgHeight - 1; i++)
+    {
+        for ( j = 1; j < imgWidth - 2; j++)
+        {
+            pBufAry[5*((i-1) * (imgWidth-3) + j - 1) ] = pBufRel[i * imgWidth + j] + pBufRel[i * imgWidth + j + 1];
+            pBufAry[5*((i-1) * (imgWidth-3) + j - 1) + 1] = i;
+            pBufAry[5*((i-1) * (imgWidth-3) + j - 1) + 2] = j;
+            pBufAry[5*((i-1) * (imgWidth-3) + j - 1) + 3] = i;
+            pBufAry[5*((i-1) * (imgWidth-3) + j - 1) + 4] = j + 1;
+        }
+    }
+    for ( i = 1; i < imgHeight - 2; i++)
+    {
+        for ( j = 1; j < imgWidth - 1; j++)
+        {
+            pBufAry[5*( (imgHeight-2)*(imgWidth-3) + (i-1) * (imgWidth-2) + j - 1) ]
+            = pBufRel[i * imgWidth + j] + pBufRel[(i + 1) * imgWidth + j];
+            pBufAry[5*( (imgHeight-2)*(imgWidth-3) + (i-1) * (imgWidth-2) + j - 1) + 1] = i;
+            pBufAry[5*( (imgHeight-2)*(imgWidth-3) + (i-1) * (imgWidth-2) + j - 1) + 2] = j;
+            pBufAry[5*( (imgHeight-2)*(imgWidth-3) + (i-1) * (imgWidth-2) + j - 1) + 3] = i + 1;
+            pBufAry[5*( (imgHeight-2)*(imgWidth-3) + (i-1) * (imgWidth-2) + j - 1) + 4] = j;
+        }
+    }
+    unsigned int k, l, iTL = ((imgWidth-2)*(imgHeight-3) + (imgWidth-3)*(imgHeight-2)), ilength = 0;
+    float disp;
+    double DataTemp;
+
+    //quick sort
+    quicksort( pBufAry, 0, iTL - 1, 5);
+
+    //selection sort
+    //selectionsort(pBufAry, 0, iTL - 1, 5);
+
+
+    for (k = 0; k < iTL; k++ )
+    {
+
+        //disp = (float)(k+1)/iTL;
+        //str.Format(L"%.4f",disp);
+        //((CMainFrame*)AfxGetMainWnd())->GetStatusBar().FindByID(ID_STATUSBAR_PANE2)->SetText(str);
+        //((CMainFrame*)AfxGetMainWnd())->GetStatusBar().FindByID(ID_STATUSBAR_PANE2)->Redraw();
+
+        MSG	 message;
+        if(::PeekMessage (&message,NULL,0,0,PM_REMOVE))
+        {
+            ::TranslateMessage (&message);
+            ::DispatchMessage (&message);
+        }
+
+        if ( pBufTag[ (int)pBufAry[5*k+1] * imgWidth + (int)pBufAry[5*k+2] ] == 0 )
+        {
+            if ( pBufTag[ (int)pBufAry[5*k+3] * imgWidth + (int)pBufAry[5*k+4] ] == 0 )
+            {
+                DataTemp = Differ(pBufData[(int)pBufAry[5*k+1] * m_imgWidth + (int)pBufAry[5*k+2] ],
+                                  pBufData[(int)pBufAry[5*k+3] * m_imgWidth + (int)pBufAry[5*k+4] ]);
+                pBufData[(int)pBufAry[5*k+3] * imgWidth + (int)pBufAry[5*k+4] ] += DataTemp;
+                ilength += 1;
+                pBufTag[ (int)pBufAry[5*k+1] * imgWidth + (int)pBufAry[5*k+2] ] = ilength;
+                pBufTag[ (int)pBufAry[5*k+3] * imgWidth + (int)pBufAry[5*k+4] ] = ilength;
+                pBufLin[ilength] = 2;
+            }
+            else
+            {
+                DataTemp = Differ(pBufData[(int)pBufAry[5*k+3] * m_imgWidth + (int)pBufAry[5*k+4] ],
+                                  pBufData[(int)pBufAry[5*k+1] * m_imgWidth + (int)pBufAry[5*k+2] ]);
+                pBufData[(int)pBufAry[5*k+1] * imgWidth + (int)pBufAry[5*k+2] ] += DataTemp;
+                pBufTag[ (int)pBufAry[5*k+1] * imgWidth + (int)pBufAry[5*k+2] ]
+                    = pBufTag[ (int)pBufAry[5*k+3] * imgWidth + (int)pBufAry[5*k+4] ];
+                pBufLin[pBufTag[ (int)pBufAry[5*k+3] * imgWidth + (int)pBufAry[5*k+4] ]] += 1;
+            }
+        }
+        else if ( pBufTag[ (int)pBufAry[5*k+3] * imgWidth + (int)pBufAry[5*k+4] ] == 0 )
+        {
+            DataTemp = Differ(pBufData[(int)pBufAry[5*k+1] * m_imgWidth + (int)pBufAry[5*k+2] ],
+                              pBufData[(int)pBufAry[5*k+3] * m_imgWidth + (int)pBufAry[5*k+4] ]);
+            pBufData[(int)pBufAry[5*k+3] * imgWidth + (int)pBufAry[5*k+4] ] += DataTemp;
+            pBufTag[ (int)pBufAry[5*k+3] * imgWidth + (int)pBufAry[5*k+4] ]
+                = pBufTag[ (int)pBufAry[5*k+1] * imgWidth + (int)pBufAry[5*k+2] ];
+            pBufLin[pBufTag[ (int)pBufAry[5*k+1] * imgWidth + (int)pBufAry[5*k+2] ]] += 1;
+        }
+        else if ( pBufTag[ (int)pBufAry[5*k+1] * imgWidth + (int)pBufAry[5*k+2] ]
+               == pBufTag[ (int)pBufAry[5*k+3] * imgWidth + (int)pBufAry[5*k+4] ])
+        {
+            continue;
+        }
+        else
+        {
+            if ( pBufLin[pBufTag[ (int)pBufAry[5*k+1] * imgWidth + (int)pBufAry[5*k+2] ]]
+               < pBufLin[pBufTag[ (int)pBufAry[5*k+3] * imgWidth + (int)pBufAry[5*k+4] ]])
+            {
+                DataTemp = Differ(pBufData[(int)pBufAry[5*k+3] * m_imgWidth + (int)pBufAry[5*k+4] ],
+                                  pBufData[(int)pBufAry[5*k+1] * m_imgWidth + (int)pBufAry[5*k+2] ]);
+                l = pBufTag[ (int)pBufAry[5*k+1] * imgWidth + (int)pBufAry[5*k+2] ];
+                for ( i = 1; i < imgHeight - 1; i++)
+                {
+                    for ( j = 1; j < imgWidth - 1; j++)
+                    {
+                        if (pBufTag[ i*imgWidth + j] == l)
+                        {
+                            pBufTag[ i*imgWidth + j]
+                                = pBufTag[ (int)pBufAry[5*k+3] * imgWidth + (int)pBufAry[5*k+4] ];
+                            pBufData[ i*imgWidth + j] += DataTemp;
+                        }
+                    }
+                }
+                pBufLin[pBufTag[ (int)pBufAry[5*k+3] * imgWidth + (int)pBufAry[5*k+4] ]] += pBufLin[l];
+            }
+            else
+            {
+                DataTemp = Differ(pBufData[(int)pBufAry[5*k+1] * m_imgWidth + (int)pBufAry[5*k+2] ],
+                                  pBufData[(int)pBufAry[5*k+3] * m_imgWidth + (int)pBufAry[5*k+4] ]);
+                l = pBufTag[ (int)pBufAry[5*k+3] * imgWidth + (int)pBufAry[5*k+4] ];
+                for ( i = 1; i < imgHeight - 1; i++)
+                {
+                    for ( j = 1; j < imgWidth - 1; j++)
+                    {
+                        if (pBufTag[ i*imgWidth + j] == l)
+                        {
+                            pBufTag[ i*imgWidth + j]
+                                = pBufTag[ (int)pBufAry[5*k+1] * imgWidth + (int)pBufAry[5*k+2] ];
+                            pBufData[ i*imgWidth + j] += DataTemp;
+                        }
+                    }
+                }
+                pBufLin[pBufTag[ (int)pBufAry[5*k+1] * imgWidth + (int)pBufAry[5*k+2] ]] += pBufLin[l];
+            }
+        }
+    }
+    for (i = 1; i < imgHeight - 1; i++)
+    {
+        DataTemp = Differ(pBufData[i*m_imgWidth+1], pBufData[i*m_imgWidth+0]);
+        pBufData[i*imgWidth+0] += DataTemp;
+        DataTemp = Differ(pBufData[i*m_imgWidth+m_imgWidth-2], pBufData[i*m_imgWidth+m_imgWidth-1]);
+        pBufData[i*imgWidth+imgWidth-1] += DataTemp;
+    }
+    for (j = 1; j < m_imgWidth; j++)
+    {
+        DataTemp = Differ(pBufData[1*m_imgWidth+j], pBufData[0*m_imgWidth+j]);
+        pBufData[0*imgWidth+j] += DataTemp;
+        DataTemp = Differ(pBufData[(m_imgHeight-2)*m_imgWidth+j], pBufData[(m_imgHeight-1)*m_imgWidth+j]);
+        pBufData[(imgHeight-1)*imgWidth+j] += DataTemp;
+    }
+
+    DataTemp = Differ(pBufData[0*m_imgWidth+1], pBufData[0*m_imgWidth+0]);
+    pBufData[0*imgWidth+0] += DataTemp;
+
+    DataTemp = Differ(pBufData[1*m_imgWidth+m_imgWidth-1], pBufData[0*m_imgWidth+m_imgWidth-1]);
+    pBufData[0*imgWidth+imgWidth-1] += DataTemp;
+
+    DataTemp = Differ(pBufData[(m_imgHeight-1)*m_imgWidth+m_imgWidth-2],
+                      pBufData[(m_imgHeight-1)*m_imgWidth+m_imgWidth-1]);
+    pBufData[(imgHeight-1)*imgWidth+imgWidth-1] += DataTemp;
+
+    DataTemp = Differ(pBufData[(m_imgHeight-2)*m_imgWidth+0], pBufData[(m_imgHeight-1)*m_imgWidth+0]);
+    pBufData[(imgHeight-1)*imgWidth+0] += DataTemp;
+
+
+    //寻找图像区域数据最值
+    double Min = pBufData[0];
+    double Max = pBufData[0];
+    for( i = 0; i < imgWidth * imgHeight; i++)
+    {
+        if ( pBufData[i] < Min )
+        {
+            Min = pBufData[i];
+        }
+        if ( pBufData[i] > Max )
+        {
+            Max = pBufData[i];
+        }
+    }
+
+    //255级灰度校正
+    for ( i = 0; i < m_imgHeightOut; i++)
+    {
+        for ( j = 0; j < m_imgWidthOut; j++)
+        {
+            m_pImgDataOut[i * lineByteOut + j]
+                = (unsigned char) ( (pBufData[i * imgWidth + j] - Min) * 255 / ( Max - Min ) );
+        }
+    }
+    m_dPhaseDifOut = Max - Min;
+
+    delete []pBufData;
+    delete []pBufAry;
+    delete []pBufLin;
+    delete []pBufRel;
+    delete []pBufTag;
+}
+
+
+
+// 解包裹3 (基于速度解包裹，用于三维显示)
+void PhaseUnwrap3(unsigned char *pImgData,int imgWidth, int BitCount, int imgHeight,int dPhaseDif)
+{
+
+    //循环变量
+    int i,j;
+
+    //准备工作
+    int lineByte = (imgWidth * BitCount / 8 + 3) / 4 * 4;
+    int lineByteOut = (imgWidth* BitCount / 8 + 3) / 4 * 4;
+
+    if(m_sImgDataOut != NULL)
+    {
+        delete []m_sImgDataOut;
+        m_sImgDataOut = NULL;
+    }
+
+    m_sImgDataOut = new float[lineByteOut * m_imgHeightOut];
+
+    //申请图像数据处理缓冲区，将图像数据变成浮点型，并转换至m_dPhaseDif范围
+    double *pBufData = new double[imgWidth * imgHeight];
+    for ( i = 0; i < imgHeight; i++)
+    {
+        for ( j = 0; j < imgWidth; j++)
+        {
+            pBufData[i * imgWidth + j] = pImgData[i * lineByte + j];
+            pBufData[i * imgWidth + j] = pBufData[i * imgWidth + j]  * dPhaseDif / 255;
+        }
+    }
+
+    //申请图像标志区，并初始化为0
+    unsigned char *pBufTag = new unsigned char[imgWidth * imgHeight];
+    memset(pBufTag, 0 , imgWidth * imgHeight);
+
+    //申请图像坐标队列
+    SIZE *pBufPosOriginal=new SIZE[imgWidth * imgHeight];
+    SIZE *pBufPos = pBufPosOriginal;
+
+    //队列长度标志
+    int iLength = 0;
+
+    //选取图像中心为起始点，并将初始点坐标标志区置脏
+    pBufPos[iLength].cx = imgHeight/2;
+    pBufPos[iLength].cy = imgWidth/2;
+    pBufTag[pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] = 1;
+
+    while( iLength != -1 )
+    {
+        //下方像素
+        if ( ( pBufPos[0].cx > 0 ) && ( pBufTag[ (pBufPos[0].cx - 1) * imgWidth + pBufPos[0].cy ]  == 0 ) )
+        {
+            //队列PUSH，并修改队列长度
+            iLength = iLength + 1;
+            pBufPos[iLength].cx = pBufPos[0].cx - 1;
+            pBufPos[iLength].cy = pBufPos[0].cy;
+
+            //进队列点坐标标志区置脏
+            pBufTag[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] = 1;
+
+            //解包裹过程
+            while ( abs( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+            - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] ) > dPhaseDif/2 )
+            {
+                if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] < -dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] + dPhaseDif;
+                }
+                else if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] > dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] - dPhaseDif;
+                }
+            }
+        }
+
+        //左方像素
+        if ( ( pBufPos[0].cy > 0 ) && ( pBufTag[ (pBufPos[0].cx) * imgWidth + pBufPos[0].cy - 1 ]  == 0 ) )
+        {
+            iLength = iLength + 1;
+            pBufPos[iLength].cx = pBufPos[0].cx;
+            pBufPos[iLength].cy = pBufPos[0].cy - 1;
+
+            pBufTag[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] = 1;
+
+            while ( abs( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+            - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] ) > dPhaseDif/2 )
+            {
+                if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] < -dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] + dPhaseDif;
+                }
+                else if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] > dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] - dPhaseDif;
+                }
+            }
+        }
+
+        //上方像素
+        if ( ( pBufPos[0].cx < imgHeight - 1 ) && ( pBufTag[ (pBufPos[0].cx + 1) * imgWidth + pBufPos[0].cy ]  == 0 ) )
+        {
+            iLength = iLength + 1;
+            pBufPos[iLength].cx = pBufPos[0].cx + 1;
+            pBufPos[iLength].cy = pBufPos[0].cy;
+
+            pBufTag[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] = 1;
+
+            while ( abs( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+            - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] ) > dPhaseDif/2 )
+            {
+                if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] < -dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] + dPhaseDif;
+                }
+                else if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] > dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] - dPhaseDif;
+                }
+            }
+        }
+
+        //右方像素
+        if ( ( pBufPos[0].cy < imgWidth - 1 ) && ( pBufTag[ (pBufPos[0].cx) * imgWidth + pBufPos[0].cy + 1 ]  == 0 ) )
+        {
+            iLength = iLength + 1;
+            pBufPos[iLength].cx = pBufPos[0].cx;
+            pBufPos[iLength].cy = pBufPos[0].cy + 1;
+
+            pBufTag[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] = 1;
+
+            while ( abs( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+            - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] ) > dPhaseDif/2 )
+            {
+                if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] < -dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] + dPhaseDif;
+                }
+                else if ( pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                - pBufData[ pBufPos[0].cx * imgWidth + pBufPos[0].cy ] > dPhaseDif/2 )
+                {
+                    pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ]
+                    = pBufData[ pBufPos[iLength].cx * imgWidth + pBufPos[iLength].cy ] - dPhaseDif;
+                }
+            }
+        }
+
+        //队列POP，并修改队列长度
+        if (iLength > 0)
+        {
+            pBufPos = pBufPos + 1;
+        }
+        iLength = iLength - 1;
+    }
+
+
+    //255级灰度校正
+    for ( i = 0; i < m_imgHeightOut; i++)
+    {
+        for ( j = 0; j < m_imgWidthOut; j++)
+        {
+            m_sImgDataOut[i * lineByteOut + j]= pBufData[i * imgWidth + j];
+        }
+    }
+
+    delete []pBufData;
+    delete []pBufPosOriginal;
+    delete []pBufTag;
+}
+
+
+// **************** 计算中位数 ********************
+int QuickSortOnce(int a[], int low, int high) {
+
+    // 将首元素作为枢轴。
+    int pivot = a[low];
+    int i = low, j = high;
+
+    while (i < j) {
+        // 从右到左，寻找首个小于pivot的元素。
+        while (a[j] >= pivot && i < j) {
+            j--;
+        }
+
+        // 执行到此，j已指向从右端起首个小于或等于pivot的元素。
+        // 执行替换。
+        a[i] = a[j];
+
+        // 从左到右，寻找首个大于pivot的元素。
+        while (a[i] <= pivot && i < j) {
+            i++;
+        }
+
+        // 执行到此，i已指向从左端起首个大于或等于pivot的元素。
+        // 执行替换。
+        a[j] = a[i];
+    }
+
+    // 退出while循环，执行至此，必定是i=j的情况。
+    // i（或j）指向的即是枢轴的位置，定位该趟排序的枢轴并将该位置返回。
+    a[i] = pivot;
+
+    return i;
+}
+
+
+void QuickSort(int a[], int low, int high) {
+    if (low >= high) {
+        return;
+    }
+
+    int pivot = QuickSortOnce(a, low, high);
+
+    // 对枢轴的左端进行排序。
+    QuickSort(a, low, pivot - 1);
+
+    // 对枢轴的右端进行排序。
+    QuickSort(a, pivot + 1, high);
+}
+
+int EvaluateMedian(int a[], int n) {
+    QuickSort(a, 0, n - 1);
+
+    if (n % 2 != 0) {
+        return a[n / 2];
+    } else {
+        return (a[n / 2] + a[n / 2 - 1]) / 2;
+    }
+}
+
+
+// ************************** 计算解包裹中的 D值 ***************************************
+void computeD(int input_S, int imgWidth, int imgHeight, int BitCount)
+{
+    //循环变量
+    int i,j;
+
+    //准备工作
+    int lineByte = (imgWidth * BitCount / 8 + 3) / 4 * 4;
+
+    //申请图像数据处理缓冲区
+    double *pBufData = new double[imgWidth * imgHeight];
+    for ( i = 0; i < imgHeight; i++)
+    {
+        for ( j = 0; j < imgWidth; j++)
+        {
+            pBufData[i * imgWidth + j] = m_pImgDataOut[i * lineByte + j];  //输入：解包裹结果
+        }
+    }
+
+
+    // 申请数据缓冲区，用于存储图像前s列（浮点型）数据 转int
+    int *array_temp = new int[imgHeight * input_S];
+    for ( i = 0; i < imgHeight * input_S; i++){
+        array_temp[i] = int(pBufData[i]);
+
+    }
+
+
+    // 计算图像数值中值
+    m_valueD = EvaluateMedian(array_temp, imgHeight * input_S);
+
+    delete []array_temp;
+    delete []pBufData;
+}
+
+
+//******************* 重构函数 ****************************************************
+void reconstruction(int imgWidth, int imgHeight, int BitCount, int s)
+{
+    //循环变量
+    int i,j;
+
+    //准备工作
+    int lineByte = (imgWidth * BitCount / 8 + 3) / 4 * 4;
+    int lineByteOut = lineByte;
+
+    if(m_rImgDataOut != NULL){
+        delete []m_rImgDataOut;
+        m_rImgDataOut = NULL;
+    }
+
+    m_rImgDataOut = new unsigned char[lineByteOut * imgHeight];
+    for ( i = 0; i < imgHeight; i++)
+    {
+        for (j=0; j< s; j++)
+            m_rImgDataOut[i * lineByte + j] = m_pImgDataOut[i * lineByte + j];
+        for (j = s; j < 2 * s; j++)
+            m_rImgDataOut[i * lineByte + j] = m_rImgDataOut[i * lineByte + (j-s)] +
+                    m_pImgDataOut[i * lineByte + j] - m_valueD;
+        for (j = 2*s; j < lineByte; j++)
+            m_rImgDataOut[i * lineByte + j] = m_rImgDataOut[i * lineByte + j - s] + m_rImgDataOut[i * lineByte + j - s] -m_rImgDataOut[i * lineByte + (j-2*s)]+
+                (m_pImgDataOut[i * lineByte + j] - m_pImgDataOut[i * lineByte + (j - s)]);
+     }
+}
+
+
+#endif // MYFUN_H

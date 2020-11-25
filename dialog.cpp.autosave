@@ -1,0 +1,188 @@
+#include "dialog.h"
+#include "ui_dialog.h"
+#include "MyFun.h"
+
+#include "mainwindow.cpp"
+
+#include <QHBoxLayout>
+#include <QDebug>
+
+Dialog::Dialog(QWidget *parent) :
+QDialog(parent),
+ui(new Ui::Dialog)
+{
+    ui->setupUi(this);
+    iniGraph3D();
+}
+
+
+
+Dialog::~Dialog()
+{
+    delete ui;
+}
+
+
+void Dialog::iniGraph3D()
+{
+
+    // 载入数据  对重构结果进行解包裹  以第一个点为基准点，将数据翻转为峰值在上
+    m_dPhaseDif = 2 * PI;
+    PhaseUnwrap3(m_rImgDataOut, m_imgWidthOut, m_nBitCountOut, m_imgHeightOut, m_dPhaseDif);
+    
+    int lineByte = (m_imgWidthOut * m_nBitCountOut / 8 + 3) / 4 * 4;
+
+    // 构建二维数组
+    float *array_temp[m_imgHeightOut];
+    for(int i=0; i<m_imgHeightOut; i++){
+        array_temp[i]=(float *)malloc(sizeof(float) * m_imgWidthOut);  // 为每个指针申请开设N字符的存储空间
+    }
+
+
+    float array_max = float(m_sImgDataOut[0] * (255 / m_dPhaseDif));  // 最大值
+    float array_min = float(m_sImgDataOut[0] * (255 / m_dPhaseDif));  // 最小值
+    for (int i = 0; i < m_imgHeightOut; i++){
+        for (int j = 0; j < m_imgWidthOut; j++){
+           array_temp[i][j] = float(m_sImgDataOut[i*lineByte+j] * (255 / m_dPhaseDif));
+           if (array_temp[i][j]>array_max) array_max = array_temp[i][j];
+           if (array_temp[i][j]<array_min) array_min = array_temp[i][j];
+        }
+    }
+
+
+    // 创建图表
+    graph3D =new Q3DSurface;
+    QWidget *graphContainer=QWidget::createWindowContainer(graph3D);
+
+    QHBoxLayout *layout = new QHBoxLayout;
+    layout->addWidget(graphContainer);
+    ui->widget->setLayout(layout);
+
+    
+    // 将坐标轴添加到图像
+    QValue3DAxis *axisX = new QValue3DAxis;
+    QValue3DAxis *axisY = new QValue3DAxis;   
+    QValue3DAxis *axisZ = new QValue3DAxis;
+
+
+    graph3D->setAxisX(axisX);
+    axisX->setRange(0, m_imgHeightOut*2);
+    axisX->setSegmentCount(4);
+
+    graph3D->setAxisY(axisY);
+    axisY->setRange(array_min, array_max);
+    axisY->setSegmentCount(4);
+
+    graph3D->setAxisZ(axisZ);
+    axisZ->setRange(0, m_imgWidthOut*2);
+    axisZ->setSegmentCount(5);
+
+
+    // 创建数据对象
+    QSurfaceDataArray *dataSet = new QSurfaceDataArray;
+    dataSet->reserve(m_imgHeightOut);
+
+    for (int i=0; i<m_imgHeightOut; i++){
+        QSurfaceDataRow *dataRow = new QSurfaceDataRow(m_imgWidthOut);
+        int x = i;
+
+        int index = 0;
+        for (int j = 0; j < m_imgWidthOut; j++){
+            int y = j;
+            float z = array_temp[i][j];
+            qDebug()<<x<<z<<y;
+
+            (*dataRow)[index++].setPosition(QVector3D(x, z, y));
+        }
+
+        *dataSet << dataRow;
+    }
+
+
+    // 创建序列，加入数据，添加到坐标系中
+    series = new QSurface3DSeries;
+
+    graph3D->addSeries(series);
+    series->dataProxy()->resetArray(dataSet);
+    graph3D->show();
+
+
+    // 设置颜色区域
+    QLinearGradient gr;
+    gr.setColorAt(0.0, Qt::darkGreen);
+    gr.setColorAt(0.5, Qt::yellow);
+    gr.setColorAt(0.8, Qt::red);
+    gr.setColorAt(1.0, Qt::darkRed);
+
+    graph3D->seriesList().at(0)->setBaseGradient(gr);
+    graph3D->seriesList().at(0)->setColorStyle(Q3DTheme::ColorStyleRangeGradient);
+
+    delete *array_temp;
+}
+
+
+// 变换视角
+void Dialog::on_comboCamera_currentIndexChanged(int index)
+{
+    Q3DCamera::CameraPreset cameraPos=Q3DCamera::CameraPreset(index);  // 将序号转换成Q3DCamera::CameraPreset类型
+    graph3D->scene()->activeCamera()   // 获取当前图标视角
+        ->setCameraPreset(cameraPos);  // 设置视角
+}
+
+
+// 水平旋转
+void Dialog::on_sliderH_valueChanged(int value)
+{
+    Q_UNUSED(value);
+    int xRot=ui->sliderH->value();
+    graph3D->scene()->activeCamera()->setXRotation(xRot);
+}
+
+
+// 垂直旋转
+void Dialog::on_sliderV_valueChanged(int value)
+{
+    Q_UNUSED(value);
+    int yRot=ui->sliderV->value();
+    graph3D->scene()->activeCamera()->setYRotation(yRot);
+}
+
+
+// 缩放
+void Dialog::on_sliderZoom_valueChanged(int value)
+{
+    Q_UNUSED(value);
+    int zoom=ui->sliderZoom->value();
+    graph3D->scene()->activeCamera()->setZoomLevel(zoom);
+}
+
+
+// 主题
+void Dialog::on_cBoxTheme_currentIndexChanged(int index)
+{
+    Q3DTheme *currentTheme=graph3D->activeTheme();
+    currentTheme->setType(Q3DTheme::Theme(index));
+}
+
+
+
+void Dialog::on_spinBox_valueChanged(int arg1)
+{
+    QFont font=graph3D->activeTheme()->font();
+    font.setPointSize(arg1);
+    graph3D->activeTheme()->setFont(font);
+}
+
+
+
+void Dialog::on_checkBox_4_clicked(bool checked)
+{
+    graph3D->axisZ()->setReversed(checked);
+}
+
+
+// 光滑
+void Dialog::on_chkBoxSmooth_clicked(bool checked)
+{
+    series->setMeshSmooth(checked);
+}

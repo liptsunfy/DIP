@@ -1,0 +1,573 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1526</width>
+    <height>827</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string> DIP v1.0.1.00020</string>
+  </property>
+  <property name="windowIcon">
+   <iconset>
+    <normaloff>icon/MyDIP.ico</normaloff>icon/MyDIP.ico</iconset>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QGroupBox" name="groupBox">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>30</y>
+      <width>201</width>
+      <height>541</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">font: 14pt &quot;Agency FB&quot;;</string>
+    </property>
+    <property name="title">
+     <string>控制面板</string>
+    </property>
+    <widget class="QPushButton" name="btnOpenfile">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>60</y>
+       <width>141</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QPushButton
+{
+    /*字体为微软雅黑*/
+    font-family:Microsoft Yahei;
+    
+	/*字体大小为20点*/
+    font-size:10pt;
+
+    /*字体颜色为白色*/  
+    color:black;
+
+    /*背景颜色*/  
+    background-color:rgb(220,220,220);
+
+    /*边框圆角半径*/ 
+    border-radius:6px;
+}</string>
+     </property>
+     <property name="text">
+      <string>打开图像</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="btnQuickUwp">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>140</y>
+       <width>141</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QPushButton
+{
+    /*字体为微软雅黑*/
+    font-family:Microsoft Yahei;
+    
+	/*字体大小为20点*/
+    font-size:10pt;
+
+    /*字体颜色为白色*/  
+    color:black;
+
+    /*背景颜色*/  
+    background-color:rgb(220,220,220);
+
+    /*边框圆角半径*/ 
+    border-radius:6px;
+}</string>
+     </property>
+     <property name="text">
+      <string> 速度解包裹</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="btnQualityUwp">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>200</y>
+       <width>141</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QPushButton
+{
+    /*字体为微软雅黑*/
+    font-family:Microsoft Yahei;
+    
+	/*字体大小为20点*/
+    font-size:10pt;
+
+    /*字体颜色为白色*/  
+    color:black;
+
+    /*背景颜色*/  
+    background-color:rgb(220,220,220);
+
+    /*边框圆角半径*/ 
+    border-radius:6px;
+}</string>
+     </property>
+     <property name="text">
+      <string>质量解包裹</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="btnReconst">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>280</y>
+       <width>141</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QPushButton
+{
+    /*字体为微软雅黑*/
+    font-family:Microsoft Yahei;
+    
+	/*字体大小为20点*/
+    font-size:10pt;
+
+    /*字体颜色为白色*/  
+    color:black;
+
+    /*背景颜色*/  
+    background-color:rgb(220,220,220);
+
+    /*边框圆角半径*/ 
+    border-radius:6px;
+}</string>
+     </property>
+     <property name="text">
+      <string>执行重构</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="btnTripleD">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>340</y>
+       <width>141</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QPushButton
+{
+    /*字体为微软雅黑*/
+    font-family:Microsoft Yahei;
+    
+	/*字体大小为20点*/
+    font-size:10pt;
+
+    /*字体颜色为白色*/  
+    color:black;
+
+    /*背景颜色*/  
+    background-color:rgb(220,220,220);
+
+    /*边框圆角半径*/ 
+    border-radius:6px;
+}</string>
+     </property>
+     <property name="text">
+      <string>三维显示</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="btnClear">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>480</y>
+       <width>141</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QPushButton
+{
+    /*字体为微软雅黑*/
+    font-family:Microsoft Yahei;
+    
+	/*字体大小为20点*/
+    font-size:10pt;
+
+    /*字体颜色为白色*/  
+    color:black;
+
+    /*背景颜色*/  
+    background-color:rgb(220,220,220);
+
+    /*边框圆角半径*/ 
+    border-radius:6px;
+}</string>
+     </property>
+     <property name="text">
+      <string>重置</string>
+     </property>
+    </widget>
+    <widget class="Line" name="line_2">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>105</y>
+       <width>161</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+    <widget class="Line" name="line">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>245</y>
+       <width>161</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+    <widget class="Line" name="line_3">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>440</y>
+       <width>161</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="btnUpw_3">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>400</y>
+       <width>141</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QPushButton
+{
+    /*字体为微软雅黑*/
+    font-family:Microsoft Yahei;
+    
+	/*字体大小为20点*/
+    font-size:10pt;
+
+    /*字体颜色为白色*/  
+    color:black;
+
+    /*背景颜色*/  
+    background-color:rgb(220,220,220);
+
+    /*边框圆角半径*/ 
+    border-radius:6px;
+}</string>
+     </property>
+     <property name="text">
+      <string> 解包裹</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QTabWidget" name="tabWidget">
+    <property name="geometry">
+     <rect>
+      <x>240</x>
+      <y>30</y>
+      <width>1271</width>
+      <height>731</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">font: 12pt &quot;Agency FB&quot;;</string>
+    </property>
+    <property name="currentIndex">
+     <number>3</number>
+    </property>
+    <widget class="QWidget" name="tab">
+     <attribute name="title">
+      <string> 原始图像</string>
+     </attribute>
+     <widget class="QLabel" name="labInputImg">
+      <property name="enabled">
+       <bool>true</bool>
+      </property>
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>10</y>
+        <width>1211</width>
+        <height>691</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="tab_2">
+     <attribute name="title">
+      <string>原始图像解包裹</string>
+     </attribute>
+     <widget class="QLabel" name="labelUpw">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>10</y>
+        <width>1211</width>
+        <height>691</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="tab_3">
+     <attribute name="title">
+      <string>重构结果</string>
+     </attribute>
+     <widget class="QLabel" name="labResultsImg">
+      <property name="enabled">
+       <bool>true</bool>
+      </property>
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>10</y>
+        <width>1251</width>
+        <height>681</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="tab_4">
+     <attribute name="title">
+      <string>解包裹结果</string>
+     </attribute>
+     <widget class="QLabel" name="labResultsImg_2">
+      <property name="enabled">
+       <bool>true</bool>
+      </property>
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>10</y>
+        <width>1241</width>
+        <height>681</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+      </property>
+     </widget>
+    </widget>
+   </widget>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1526</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>文件(F)</string>
+    </property>
+    <addaction name="actionOpenfile"/>
+    <addaction name="actionSave"/>
+    <addaction name="separator"/>
+    <addaction name="actionReset"/>
+   </widget>
+   <widget class="QMenu" name="menuRun">
+    <property name="title">
+     <string>运行(R)</string>
+    </property>
+    <addaction name="actionQuickUpw"/>
+    <addaction name="actionQualityUpw"/>
+    <addaction name="separator"/>
+    <addaction name="actionReconstruction"/>
+    <addaction name="actionDisplay"/>
+    <addaction name="separator"/>
+    <addaction name="actionReset_2"/>
+   </widget>
+   <widget class="QMenu" name="menu">
+    <property name="title">
+     <string>视图(V)</string>
+    </property>
+   </widget>
+   <widget class="QMenu" name="menu_H">
+    <property name="title">
+     <string>帮助(H)</string>
+    </property>
+    <addaction name="actionAbout"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuRun"/>
+   <addaction name="menu"/>
+   <addaction name="menu_H"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionAbout">
+   <property name="icon">
+    <iconset resource="icon.qrc">
+     <normaloff>:/icon/about.ico</normaloff>:/icon/about.ico</iconset>
+   </property>
+   <property name="text">
+    <string>关于</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+A</string>
+   </property>
+  </action>
+  <action name="actionOpenfile">
+   <property name="icon">
+    <iconset resource="icon.qrc">
+     <normaloff>:/icon/open.ico</normaloff>:/icon/open.ico</iconset>
+   </property>
+   <property name="text">
+    <string>打开</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
+  </action>
+  <action name="actionSave">
+   <property name="icon">
+    <iconset resource="icon.qrc">
+     <normaloff>:/icon/save.ico</normaloff>:/icon/save.ico</iconset>
+   </property>
+   <property name="text">
+    <string>保存</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="actionReset">
+   <property name="icon">
+    <iconset resource="icon.qrc">
+     <normaloff>:/icon/exit.ico</normaloff>:/icon/exit.ico</iconset>
+   </property>
+   <property name="text">
+    <string>退出</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+E</string>
+   </property>
+  </action>
+  <action name="actionQuickUpw">
+   <property name="icon">
+    <iconset resource="icon.qrc">
+     <normaloff>:/icon/quick.ico</normaloff>:/icon/quick.ico</iconset>
+   </property>
+   <property name="text">
+    <string>快速解包裹</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+U</string>
+   </property>
+  </action>
+  <action name="actionQualityUpw">
+   <property name="icon">
+    <iconset resource="icon.qrc">
+     <normaloff>:/icon/quality.ico</normaloff>:/icon/quality.ico</iconset>
+   </property>
+   <property name="text">
+    <string>质量解包裹</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+U</string>
+   </property>
+  </action>
+  <action name="actionReconstruction">
+   <property name="icon">
+    <iconset resource="icon.qrc">
+     <normaloff>:/icon/run.ico</normaloff>:/icon/run.ico</iconset>
+   </property>
+   <property name="text">
+    <string>重构</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+R</string>
+   </property>
+  </action>
+  <action name="actionDisplay">
+   <property name="icon">
+    <iconset resource="icon.qrc">
+     <normaloff>:/icon/dispaly.ico</normaloff>:/icon/dispaly.ico</iconset>
+   </property>
+   <property name="text">
+    <string>三维显示</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+D</string>
+   </property>
+  </action>
+  <action name="actionReset_2">
+   <property name="icon">
+    <iconset resource="icon.qrc">
+     <normaloff>:/icon/clear.ico</normaloff>:/icon/clear.ico</iconset>
+   </property>
+   <property name="text">
+    <string>重置</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+R</string>
+   </property>
+  </action>
+ </widget>
+ <resources>
+  <include location="icon.qrc"/>
+ </resources>
+ <connections/>
+</ui>

@@ -1,0 +1,313 @@
+﻿#include "mainwindow.h"
+#include "ui_mainwindow.h"
+
+#include "MyFun.h"
+#include "dialog.h"
+
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QInputDialog>
+#include <cstring>
+
+using namespace std;
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow)
+{
+    ui->setupUi(this);
+}
+
+
+MainWindow::~MainWindow()
+{
+    delete ui;
+}
+
+
+
+// 选择图像并打开图像
+void MainWindow::on_btnOpenfile_clicked()
+{
+    QString inputFileName;
+    inputFileName = QFileDialog::getOpenFileName(this,tr("选择图像"),"",tr("*.bmp"));
+
+    if(inputFileName.isEmpty()){
+        QMessageBox mesg;
+        mesg.warning(this,"警告","请重新选择文件！");
+
+        // 清除界面的原有显示的结果，如果存在
+        ui->labInputImg->clear();
+        ui->labelUpw->clear();
+        ui->labResultsImg->clear();
+
+        return;
+    }
+
+    else {
+        QImage *inputImage = new QImage;
+        inputImage->load(inputFileName);  //载入图像
+        inputImage->scaled(ui->labInputImg->size(),Qt::KeepAspectRatio);
+        ui->labInputImg->setPixmap(QPixmap::fromImage(*inputImage));
+
+        // 读取BMP图像数据
+        readBmp(inputFileName);
+
+        if (m_nBitCount!=8){
+            QMessageBox mesg;
+            mesg.warning(this,"警告","只能处理8位BMP图像，请重新选择图像！");
+            return;
+        }
+
+        if (m_pImgData==NULL)
+        {
+            QMessageBox mesg;
+            mesg.warning(this,"警告","文件读取失败！");
+            return;
+        }
+
+        // 清除界面的原有显示的结果，如果存在
+        ui->labelUpw->clear();
+        ui->labResultsImg->clear();
+    }
+}
+
+
+
+// 执行解包裹
+void MainWindow::on_btnReconst_clicked()
+{
+
+//--判断是否执行上一步
+    if (m_pImgData==NULL)
+    {
+        QMessageBox mesg;
+        mesg.warning(this,"警告","请选择待处理图像！");
+        return;
+    }
+
+    else {
+        ui->labResultsImg->clear();
+
+        // 清空输出值,置空
+        if(m_pImgDataOut!=NULL){
+            delete [] m_pImgDataOut;
+            m_pImgDataOut = NULL;
+        }
+
+        if (m_rImgDataOut!=NULL){
+            delete [] m_rImgDataOut;
+            byteArray=NULL;
+            m_rImgDataOut = NULL;
+        }
+
+        QString dlgTitle = "执行重构";
+        QString txtLabel = "<br>"
+                           "请选择或输入S值(正整数):"
+                           "<br>";
+
+        int defaultValue = 25;
+        int decimals = 0;  // 小数点位数
+        int minValue = 0, maxValue = 1000;
+
+        bool ok;
+        int inputValue = QInputDialog::getDouble(this, dlgTitle,txtLabel,
+                                                     defaultValue,minValue,maxValue,decimals,&ok);
+        if (ok) //确认选择
+        {
+            // 解包裹
+            m_dPhaseDif = 2*PI;
+            PhaseUnwrap(m_pImgData, m_imgWidth, m_nBitCount, m_imgHeight,m_dPhaseDif);
+
+            // 计算d值
+            computeD(inputValue,m_imgWidth,m_imgHeight,m_nBitCount);
+            qDebug()<<m_valueD;
+
+            // 执行重构
+            reconstruction(m_imgWidth, m_imgHeight, m_nBitCount, inputValue);
+
+            // 显示重构结果
+            showBmp(m_rImgDataOut, m_imgWidth, m_imgHeight, m_nBitCount, pColorTable);
+
+            QPixmap showimage2;
+            showimage2.loadFromData((const uchar*)byteArray.data(), byteArray.size());
+            ui->labResultsImg->setPixmap(showimage2);
+        }
+    }
+}
+
+
+// 对重构结果进行解包裹
+void MainWindow::on_btnReconstUwp_clicked()
+{
+    if (m_rImgDataOut==NULL)
+    {
+        QMessageBox mesg;
+        mesg.warning(this,"警告","请先执行上一步！");
+        return;
+    }
+    else{
+        // 解包裹
+        m_dPhaseDif = 2*PI;
+        PhaseUnwrap4(m_rImgDataOut, m_imgWidth, m_nBitCount, m_imgHeight,m_dPhaseDif);
+
+        showBmp(m_ruImgDataOut, m_imgWidth, m_imgHeight, m_nBitCount, pColorTable);
+
+        QPixmap showimage4;
+        showimage4.loadFromData((const uchar*)byteArray.data(), byteArray.size());
+        ui->labUwp3->setPixmap(showimage4);
+    }
+}
+
+
+
+//****三维显示数值结果
+void MainWindow::on_btnTripleD_clicked()
+{
+    if (m_rImgDataOut==NULL)
+    {
+        QMessageBox mesg;
+        mesg.warning(this,"警告","请首先执行解包裹");
+        return;
+    }
+
+    else{
+        Dialog *dispaly = new Dialog();
+        dispaly->show();
+    }
+}
+
+
+//*************** 执行速度解包裹 ************************
+void MainWindow::on_btnQuickUwp_clicked()
+{
+    if (m_pImgData==NULL){
+        QMessageBox mesg;
+        mesg.warning(this,"警告","请先执行上一步，选择待处理图像！");
+        return;
+    }
+    else {
+        m_dPhaseDif = 2*PI;
+        PhaseUnwrap(m_pImgData,m_imgWidth, m_nBitCount, m_imgHeight,m_dPhaseDif);
+
+        // 结果展示
+        showBmp(m_pImgDataOut, m_imgWidth, m_imgHeight, m_nBitCount, pColorTable);
+
+        QPixmap showimage2;
+        showimage2.loadFromData((const uchar*)byteArray.data(), byteArray.size());
+        ui->labelUpw->setPixmap(showimage2);
+    }
+}
+
+
+//***************  执行（质量）解包裹 ****************************
+void MainWindow::on_btnQualityUwp_clicked()
+{
+    if (m_pImgData==NULL){
+        QMessageBox mesg;
+        mesg.warning(this,"警告","请先执行上一步，选择待处理图像！");
+        return;
+    }
+
+    else {
+        m_dPhaseDif = 2*PI;
+        PhaseUnwrap2(m_pImgData,m_imgWidth, m_nBitCount, m_imgHeight,m_dPhaseDif);
+
+        // 结果展示
+        showBmp(m_pImgDataOut, m_imgWidth, m_imgHeight, m_nBitCount, pColorTable);
+
+        QPixmap showimage3;
+        showimage3.loadFromData((const uchar*)byteArray.data(), byteArray.size());
+        ui->labelUpw->setPixmap(showimage3);
+    }
+}
+
+
+//********************** 清空界面 重置变量 *********************************************
+void MainWindow::on_btnClear_clicked()
+{
+    // 清空界面
+    ui->labInputImg->clear();
+    ui->labelUpw->clear();
+    ui->labResultsImg->clear();
+    ui->labUwp3->clear();
+
+    m_pImgData = NULL;
+    m_pImgDataOut = NULL;
+    m_rImgDataOut =NULL;
+    m_sImgDataOut = NULL;
+    m_ruImgDataOut = NULL;
+}
+
+
+
+//******************** 菜单栏功能 *************************************************
+
+// 文件 - 打开
+void MainWindow::on_actionOpenfile_triggered()
+{
+    on_btnOpenfile_clicked();
+}
+
+
+//  帮助 - 关于 *
+void MainWindow::on_actionAbout_triggered()
+{
+    QString INFORMATION = "<font size='18' color='blue'>DIP 相位重构</font>"
+                          "<br>"
+                          "<br>"
+                          "<br>版本：v1.0.1.00020"
+                          "<br>"
+                          "<br>Copyright©2020HFUT.仪器科学与光电工程学院  "
+                          "<br>";
+
+    QMessageBox aboutDIP;
+    aboutDIP.information(this,"关于DIP",INFORMATION,QMessageBox::Close);
+    return;
+}
+
+
+// 速度解包裹
+void MainWindow::on_actionQuickUpw_triggered()
+{
+    on_btnQuickUwp_clicked();
+}
+
+
+// 质量解包裹
+void MainWindow::on_actionQualityUpw_triggered()
+{
+    on_btnQualityUwp_clicked();
+}
+
+
+// 执行重构
+void MainWindow::on_actionReconstruction_triggered()
+{
+    on_btnReconst_clicked();
+}
+
+
+// 重置界面
+void MainWindow::on_actionReset_2_triggered()
+{
+    on_btnClear_clicked();
+}
+
+// 三维显示
+void MainWindow::on_actionDisplay_triggered()
+{
+    on_btnTripleD_clicked();
+}
+
+
+
+// 退出程序，关闭应用窗口
+void MainWindow::on_actionReset_triggered()
+{
+    if (!(QMessageBox::information(this,tr("关闭程序"),tr("是否确认退出程序?"),tr("确认"),tr("取消"))))
+    {
+        QApplication* app;
+        app->exit(0);
+     }
+}

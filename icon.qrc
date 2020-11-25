@@ -1,0 +1,16 @@
+<RCC>
+    <qresource prefix="/image">
+        <file>icon/about.ico</file>
+        <file>icon/clear.ico</file>
+        <file>icon/editor.ico</file>
+        <file>icon/exit.ico</file>
+        <file>icon/MyDIP.ico</file>
+        <file>icon/open.ico</file>
+        <file>icon/run.ico</file>
+        <file>icon/save.ico</file>
+        <file>icon/quick.ico</file>
+        <file>icon/quality.ico</file>
+        <file>icon/dispaly.ico</file>
+        <file>icon/show.ico</file>
+    </qresource>
+</RCC>
